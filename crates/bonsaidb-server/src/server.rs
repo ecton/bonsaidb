@@ -16,7 +16,7 @@ use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
 use bonsaidb_core::{
     admin::User,
-    arc_bytes::serde::Bytes,
+    arc_bytes::{serde::Bytes, OwnedBytes},
     circulate::{Message, Relay, Subscriber},
     connection::{self, AccessPolicy, Connection, QueryKey, Range, Sort, StorageConnection},
     custom_api::{CustomApi, CustomApiResult},
@@ -795,20 +795,30 @@ impl<B: Backend> CustomServer<B> {
         Ok(permissions)
     }
 
-    async fn publish_message(&self, database: &str, topic: &str, payload: Vec<u8>) {
+    async fn publish_message(
+        &self,
+        database: &str,
+        topic: &str,
+        payload: impl Into<OwnedBytes> + Send,
+    ) {
         self.data
             .relay
             .publish_message(Message {
                 topic: database_topic(database, topic),
-                payload,
+                payload: payload.into(),
             })
             .await;
     }
 
-    async fn publish_serialized_to_all(&self, database: &str, topics: &[String], payload: Vec<u8>) {
+    async fn publish_raw_to_all(
+        &self,
+        database: &str,
+        topics: &[String],
+        payload: impl Into<OwnedBytes> + Send,
+    ) {
         self.data
             .relay
-            .publish_serialized_to_all(
+            .publish_raw_to_all(
                 topics
                     .iter()
                     .map(|topic| database_topic(database, topic))
@@ -1795,7 +1805,7 @@ impl<'s, B: Backend> bonsaidb_core::networking::PublishHandler for DatabaseDispa
     async fn resource_name<'a>(
         &'a self,
         topic: &'a String,
-        _payload: &'a Bytes,
+        _payload: &'a OwnedBytes,
     ) -> Result<ResourceName<'a>, Error> {
         Ok(pubsub_topic_resource_name(&self.name, topic))
     }
@@ -1808,11 +1818,11 @@ impl<'s, B: Backend> bonsaidb_core::networking::PublishHandler for DatabaseDispa
         &self,
         _permissions: &Permissions,
         topic: String,
-        payload: Bytes,
+        payload: OwnedBytes,
     ) -> Result<Response<CustomApiResult<B::CustomApi>>, Error> {
         self.server_dispatcher
             .server
-            .publish_message(&self.name, &topic, payload.into_vec())
+            .publish_message(&self.name, &topic, payload)
             .await;
         Ok(Response::Ok)
     }
@@ -1824,7 +1834,7 @@ impl<'s, B: Backend> bonsaidb_core::networking::PublishToAllHandler for Database
         &self,
         permissions: &Permissions,
         topics: &Vec<String>,
-        _payload: &Bytes,
+        _payload: &OwnedBytes,
     ) -> Result<(), Error> {
         for topic in topics {
             let topic_name = pubsub_topic_resource_name(&self.name, topic);
@@ -1844,11 +1854,11 @@ impl<'s, B: Backend> bonsaidb_core::networking::PublishToAllHandler for Database
         &self,
         _permissions: &Permissions,
         topics: Vec<String>,
-        payload: Bytes,
+        payload: OwnedBytes,
     ) -> Result<Response<CustomApiResult<B::CustomApi>>, Error> {
         self.server_dispatcher
             .server
-            .publish_serialized_to_all(&self.name, &topics, payload.into_vec())
+            .publish_raw_to_all(&self.name, &topics, payload)
             .await;
         Ok(Response::Ok)
     }

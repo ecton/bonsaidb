@@ -2,6 +2,7 @@ use std::{ops::Deref, sync::Arc};
 
 use async_trait::async_trait;
 use bonsaidb_core::{
+    arc_bytes::OwnedBytes,
     circulate::Message,
     connection::{AccessPolicy, QueryKey, Range, Sort},
     document::{AnyDocumentId, OwnedDocument},
@@ -57,7 +58,29 @@ impl<B: Backend> PubSub for ServerDatabase<B> {
         payload: &P,
     ) -> Result<(), bonsaidb_core::Error> {
         self.server
-            .publish_serialized_to_all(self.db.name(), &topics, pot::to_vec(payload)?)
+            .publish_raw_to_all(self.db.name(), &topics, pot::to_vec(payload)?)
+            .await;
+        Ok(())
+    }
+
+    async fn publish_raw<S: Into<String> + Send, P: Into<OwnedBytes> + Send>(
+        &self,
+        topic: S,
+        payload: P,
+    ) -> Result<(), bonsaidb_core::Error> {
+        self.server
+            .publish_message(self.db.name(), &topic.into(), payload)
+            .await;
+        Ok(())
+    }
+
+    async fn publish_raw_to_all<P: Into<OwnedBytes> + Send>(
+        &self,
+        topics: Vec<String>,
+        payload: P,
+    ) -> Result<(), bonsaidb_core::Error> {
+        self.server
+            .publish_raw_to_all(self.db.name(), &topics, payload)
             .await;
         Ok(())
     }

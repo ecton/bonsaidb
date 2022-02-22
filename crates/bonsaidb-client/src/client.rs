@@ -17,6 +17,7 @@ use async_trait::async_trait;
 #[cfg(feature = "password-hashing")]
 use bonsaidb_core::connection::{Authenticated, Authentication};
 use bonsaidb_core::{
+    arc_bytes::OwnedBytes,
     connection::{Database, StorageConnection},
     custom_api::{CustomApi, CustomApiResult},
     networking::{
@@ -828,7 +829,7 @@ async fn process_response_payload<A: CustomApi>(
                     if sender
                         .send(std::sync::Arc::new(bonsaidb_core::circulate::Message {
                             topic,
-                            payload: payload.into_vec(),
+                            payload: OwnedBytes::from(payload.0),
                         }))
                         .is_err()
                     {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bonsaidb_core::{
-    arc_bytes::serde::Bytes,
+    arc_bytes::OwnedBytes,
     circulate::Message,
     custom_api::CustomApi,
     networking::{DatabaseRequest, DatabaseResponse, Request, Response},
@@ -51,13 +51,31 @@ where
         payload: &P,
     ) -> Result<(), bonsaidb_core::Error> {
         let payload = pot::to_vec(&payload)?;
+        self.publish_raw(topic, payload).await
+    }
+
+    async fn publish_to_all<P: Serialize + Sync>(
+        &self,
+        topics: Vec<String>,
+        payload: &P,
+    ) -> Result<(), bonsaidb_core::Error> {
+        let payload = pot::to_vec(&payload)?;
+        self.publish_raw_to_all(topics, payload).await
+    }
+
+    async fn publish_raw<S: Into<String> + Send, P: Into<OwnedBytes> + Send>(
+        &self,
+        topic: S,
+        payload: P,
+    ) -> Result<(), bonsaidb_core::Error> {
+        let payload = payload.into();
         match self
             .client
             .send_request(Request::Database {
                 database: self.name.to_string(),
                 request: DatabaseRequest::Publish {
                     topic: topic.into(),
-                    payload: Bytes::from(payload),
+                    payload,
                 },
             })
             .await?
@@ -70,20 +88,17 @@ where
         }
     }
 
-    async fn publish_to_all<P: Serialize + Sync>(
+    async fn publish_raw_to_all<P: Into<OwnedBytes> + Send>(
         &self,
         topics: Vec<String>,
-        payload: &P,
+        payload: P,
     ) -> Result<(), bonsaidb_core::Error> {
-        let payload = pot::to_vec(&payload)?;
+        let payload = payload.into();
         match self
             .client
             .send_request(Request::Database {
                 database: self.name.to_string(),
-                request: DatabaseRequest::PublishToAll {
-                    topics,
-                    payload: Bytes::from(payload),
-                },
+                request: DatabaseRequest::PublishToAll { topics, payload },
             })
             .await?
         {

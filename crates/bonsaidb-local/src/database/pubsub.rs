@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 pub use bonsaidb_core::circulate::Relay;
 use bonsaidb_core::{
+    arc_bytes::OwnedBytes,
     circulate,
     pubsub::{self, database_topic, PubSub},
     Error,
@@ -48,6 +49,39 @@ impl PubSub for super::Database {
                 payload,
             )
             .await?;
+        Ok(())
+    }
+
+    async fn publish_raw<S: Into<String> + Send, P: Into<OwnedBytes> + Send>(
+        &self,
+        topic: S,
+        payload: P,
+    ) -> Result<(), bonsaidb_core::Error> {
+        self.data
+            .storage
+            .relay()
+            .publish_raw(database_topic(&self.data.name, &topic.into()), payload)
+            .await;
+        Ok(())
+    }
+
+    async fn publish_raw_to_all<P: Into<OwnedBytes> + Send>(
+        &self,
+        topics: Vec<String>,
+        payload: P,
+    ) -> Result<(), bonsaidb_core::Error> {
+        let payload = payload.into();
+        self.data
+            .storage
+            .relay()
+            .publish_raw_to_all(
+                topics
+                    .iter()
+                    .map(|topic| database_topic(&self.data.name, topic))
+                    .collect(),
+                payload,
+            )
+            .await;
         Ok(())
     }
 }

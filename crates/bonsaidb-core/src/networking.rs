@@ -1,4 +1,4 @@
-use arc_bytes::serde::Bytes;
+use arc_bytes::{serde::Bytes, OwnedBytes};
 use derive_where::derive_where;
 use schema::SchemaName;
 use serde::{Deserialize, Serialize};
@@ -230,7 +230,7 @@ pub enum DatabaseRequest {
         /// The topics to publish to.
         topic: String,
         /// The payload to publish.
-        payload: Bytes,
+        payload: OwnedBytes,
     },
     /// Publishes `payload` to all subscribers of all `topics`.
     #[cfg_attr(feature = "actionable-traits", actionable(protection = "custom"))]
@@ -238,7 +238,7 @@ pub enum DatabaseRequest {
         /// The topics to publish to.
         topics: Vec<String>,
         /// The payload to publish.
-        payload: Bytes,
+        payload: OwnedBytes,
     },
     /// Subscribes `subscriber_id` to messages for `topic`.
     #[cfg_attr(feature = "actionable-traits", actionable(protection = "simple"))]

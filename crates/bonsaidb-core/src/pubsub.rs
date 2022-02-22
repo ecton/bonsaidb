@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use arc_bytes::OwnedBytes;
 use async_trait::async_trait;
 use circulate::{flume, Message, Relay};
 use serde::Serialize;
@@ -22,11 +23,25 @@ pub trait PubSub {
         payload: &P,
     ) -> Result<(), Error>;
 
+    /// Publishes a `payload` without any extra processing to all subscribers of `topic`.
+    async fn publish_raw<S: Into<String> + Send, P: Into<OwnedBytes> + Send>(
+        &self,
+        topic: S,
+        payload: P,
+    ) -> Result<(), Error>;
+
     /// Publishes a `payload` to all subscribers of all `topics`.
     async fn publish_to_all<P: Serialize + Sync>(
         &self,
         topics: Vec<String>,
         payload: &P,
+    ) -> Result<(), Error>;
+
+    /// Publishes a `payload` without any extra processing to all subscribers of `topic`.
+    async fn publish_raw_to_all<P: Into<OwnedBytes> + Send>(
+        &self,
+        topics: Vec<String>,
+        payload: P,
     ) -> Result<(), Error>;
 }
 
@@ -67,6 +82,24 @@ impl PubSub for Relay {
         payload: &P,
     ) -> Result<(), Error> {
         self.publish_to_all(topics, payload).await?;
+        Ok(())
+    }
+
+    async fn publish_raw<S: Into<String> + Send, P: Into<OwnedBytes> + Send>(
+        &self,
+        topic: S,
+        payload: P,
+    ) -> Result<(), Error> {
+        self.publish_raw(topic, payload).await;
+        Ok(())
+    }
+
+    async fn publish_raw_to_all<P: Into<OwnedBytes> + Send>(
+        &self,
+        topics: Vec<String>,
+        payload: P,
+    ) -> Result<(), Error> {
+        self.publish_raw_to_all(topics, payload).await;
         Ok(())
     }
 }
